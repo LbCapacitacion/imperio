@@ -1,0 +1,39 @@
+# SOLO para un sitio vacío. Vuelve a crear .env, genera otra APP_KEY y corre
+# migrate --seed. En el sitio que ya está en línea usar domcloud-update.yml.
+source: https://github.com/LbCapacitacion/imperio.git
+features:
+  - php 8.3
+  - mysql
+  - ssl always
+nginx:
+  root: public_html/public
+  fastcgi: "on"
+  index: index.html
+  locations:
+    - match: /api
+      try_files: $uri $uri/ /index.php$is_args$args
+    - match: /up
+      try_files: $uri /index.php$is_args$args
+    - match: ~ \.[^\/]+(?<!\.php)$
+      try_files: $uri =404
+    - match: /
+      try_files: $uri $uri/ /index.html
+commands:
+  - rm -f database/migrations/2025_11_05_005014_add_mesa_to_pedidos_table.php database/migrations/2025_11_05_005248_add_mesa_to_pedidos_table.php
+  - composer install --no-dev --optimize-autoloader --no-interaction
+  - cp .env.example .env
+  - sed -ri "s/^APP_ENV=.*/APP_ENV=production/" .env
+  - sed -ri "s/^APP_DEBUG=.*/APP_DEBUG=false/" .env
+  - sed -ri "s/APP_URL=.*/APP_URL=https:\/\/${DOMAIN}/" .env
+  - sed -ri "s/(# )?DB_CONNECTION=.*/DB_CONNECTION=mysql/" .env
+  - sed -ri "s/(# )?DB_HOST=.*/DB_HOST=localhost/" .env
+  - sed -ri "s/(# )?DB_PORT=.*/DB_PORT=3306/" .env
+  - sed -ri "s/(# )?DB_DATABASE=.*/DB_DATABASE=${DATABASE}/" .env
+  - sed -ri "s/(# )?DB_USERNAME=.*/DB_USERNAME=${USERNAME}/" .env
+  - sed -ri "s/(# )?DB_PASSWORD=.*/DB_PASSWORD=${MYPASSWD}/" .env
+  - php artisan key:generate --force --ansi
+  - php artisan migrate --force --seed --ansi
+  - php artisan storage:link || true
+  - chmod 0750 -R storage bootstrap/cache || true
+  - php artisan config:cache
+  - php artisan view:cache

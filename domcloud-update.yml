@@ -1,0 +1,12 @@
+# Actualización de salon-imperio. No borra la base ni los usuarios.
+# Pegar en DomCloud: sitio -> Deploy -> Add a deployment task -> Execute.
+# No lleva "source": esa clave reemplaza public_html y este archivo no debe usarse junto con domcloud.yml.
+commands:
+  - test -f .env
+  - cp .env ../imperio.env.bak
+  - git pull --ff-only origin main
+  - test -f .env || cp ../imperio.env.bak .env
+  - composer install --no-dev --optimize-autoloader --no-interaction
+  - php artisan optimize:clear --ansi
+  - php artisan config:cache --ansi
+  - php artisan view:cache --ansi

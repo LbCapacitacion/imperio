@@ -28,51 +28,70 @@ class PedidoController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'mesa' => 'required|string',
-            'total' => 'required|numeric',
-            'productos' => 'required|array',
-            'productos.*.id' => 'required|exists:productos,id',
-            'productos.*.cantidad' => 'required|integer|min:1'
+            'mesa' => 'required|string|max:255',
+            'productos' => 'required|array|min:1',
+            'productos.*.id' => 'required|integer|exists:productos,id',
+            'productos.*.cantidad' => 'required|integer|min:1',
         ]);
+
+        $cantidades = collect($request->input('productos'))
+            ->groupBy(fn (array $linea) => (int) $linea['id'])
+            ->map(fn ($lineas) => (int) $lineas->sum('cantidad'));
 
         try {
             DB::beginTransaction();
 
-            $pedido = new Pedido;
-            $pedido->user_id = Auth::user()->id;
-            $pedido->mesa = $request->mesa;
-            $pedido->total = $request->total;
-            $pedido->save();
+            $productos = Producto::whereIn('id', $cantidades->keys())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-            $pedido_producto = [];
+            $total = 0;
+            $pedidoProducto = [];
 
-            foreach ($request->productos as $productoData) {
-                $producto = Producto::find($productoData['id']);
+            foreach ($cantidades as $productoId => $cantidad) {
+                $producto = $productos->get($productoId);
 
-                // 1. Re-validación segura de Stock (aunque ya se hizo en el frontend, es vital aquí)
-                if (!$producto || $producto->stock < $productoData['cantidad']) {
+                if (! $producto || (int) $producto->disponible !== 1) {
                     DB::rollBack();
-                    $nombreProducto = $producto->nombre ?? $productoData['id'];
+                    $nombre = $producto->nombre ?? $productoId;
 
                     return response()->json([
-                        'error' => "Stock insuficiente o producto no encontrado: {$nombreProducto}"
+                        'error' => "Producto no disponible: {$nombre}",
                     ], 400);
                 }
 
-                // 2. Descuento de Stock seguro usando decrement() dentro de la transacción
-                // Esta línea asegura el decremento. Si falla, la transacción revierte.
-                $producto->decrement('stock', $productoData['cantidad']);
+                if ($producto->stock < $cantidad) {
+                    DB::rollBack();
 
-                $pedido_producto[] = [
-                    'pedido_id' => $pedido->id,
-                    'producto_id' => $productoData['id'],
-                    'cantidad' => $productoData['cantidad'],
+                    return response()->json([
+                        'error' => "Stock insuficiente o producto no encontrado: {$producto->nombre}",
+                    ], 400);
+                }
+
+                $total += (float) $producto->precio * $cantidad;
+                $producto->decrement('stock', $cantidad);
+
+                $pedidoProducto[] = [
+                    'producto_id' => $productoId,
+                    'cantidad' => $cantidad,
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now(),
                 ];
             }
 
-            PedidoProducto::insert($pedido_producto);
+            $pedido = new Pedido;
+            $pedido->user_id = Auth::id();
+            $pedido->mesa = $request->mesa;
+            $pedido->total = round($total, 2);
+            $pedido->save();
+
+            foreach ($pedidoProducto as &$linea) {
+                $linea['pedido_id'] = $pedido->id;
+            }
+            unset($linea);
+
+            PedidoProducto::insert($pedidoProducto);
 
             DB::commit(); // Si todo fue bien, guardar los cambios
 
