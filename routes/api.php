@@ -46,5 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 //autenticacion
 
-Route::post('/registro', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('throttle:10,1')->group(function () {
+    Route::post('/registro', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+});

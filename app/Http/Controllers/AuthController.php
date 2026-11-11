@@ -14,13 +14,12 @@ class AuthController extends Controller
 
     public function register(RegistroRequest $request)
     {
-        $data = $request->validated();   
+        $data = $request->validated();
 
-        //crear al usuario
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => bcrypt($data['password']),
+            'password' => $data['password'],
         ]);
 
         return [
