@@ -23,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pedidos', [PedidoController::class, 'store']);
 
     Route::middleware('admin')->group(function () {
+        Route::get('/pedidos/jornada', [PedidoController::class, 'jornada']);
+        Route::patch('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar']);
+
         Route::apiResource('/pedidos', PedidoController::class)->except(['store']);
         Route::apiResource('/categorias', CategoriaController::class)->except(['index']);
 

@@ -121,6 +121,10 @@ class PedidoController extends Controller
      */
     public function update(Request $request, Pedido $pedido)
     {
+        if ((int) $pedido->estado === 2) {
+            return response()->json(['message' => 'El pedido está cancelado'], 422);
+        }
+
         $pedido->estado = 1;
         $pedido->save();
         return [
@@ -140,6 +144,10 @@ class PedidoController extends Controller
     //para los tickets
     public function complete(Request $request, Pedido $pedido)
     {
+        if ((int) $pedido->estado === 2) {
+            return response()->json(['message' => 'El pedido está cancelado'], 422);
+        }
+
         try {
 
             $pedido->estado = 1;
@@ -165,12 +173,7 @@ class PedidoController extends Controller
         $dateString = $request->query('date', now()->toDateString());
 
         try {
-            $date = Carbon::parse($dateString);
-
-            // Inicio: 20:00 del día $date
-            $start = $date->copy()->setTime(14, 0, 0);
-            // Fin: 06:00 del día siguiente
-            $end = $date->copy()->addDay()->setTime(8, 0, 0);
+            [$date, $start, $end] = $this->ventanaJornada($dateString);
 
             $pedidos = Pedido::with('productos', 'user')
                 ->where('estado', 1)
@@ -180,7 +183,7 @@ class PedidoController extends Controller
             $totalDia = $pedidos->sum('total');
 
             return response()->json([
-                'date' => $date->toDateString(),
+                'date' => $date,
                 'start' => $start->toDateTimeString(),
                 'end' => $end->toDateTimeString(),
                 'total_sales' => $totalDia,
@@ -192,5 +195,104 @@ class PedidoController extends Controller
             return response()->json(['message' => 'Error al generar reporte de ventas'], 500);
         }
     }
-    // ...existing code...
+
+    /**
+     * Pedidos de la jornada. estado 2 queda en la lista y fuera del corte.
+     */
+    public function jornada(Request $request)
+    {
+        $dateString = $request->query('date');
+
+        if (! $dateString) {
+            $ahora = now();
+            $dateString = $ahora->hour < 14
+                ? $ahora->copy()->subDay()->toDateString()
+                : $ahora->toDateString();
+        }
+
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateString)) {
+            return response()->json(['message' => 'Fecha inválida'], 422);
+        }
+
+        try {
+            [$date, $start, $end] = $this->ventanaJornada($dateString);
+
+            $pedidos = Pedido::with('productos', 'user')
+                ->where(function ($query) use ($start, $end) {
+                    $query->whereBetween('created_at', [$start, $end])
+                        ->orWhereBetween('updated_at', [$start, $end]);
+                })
+                ->orderByDesc('id')
+                ->get();
+
+            return response()->json([
+                'date' => $date,
+                'start' => $start->toDateTimeString(),
+                'end' => $end->toDateTimeString(),
+                'pedidos' => $pedidos,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Error listando jornada: ' . $e->getMessage());
+
+            return response()->json(['message' => 'Error al cargar la jornada'], 500);
+        }
+    }
+
+    public function cancelar(Pedido $pedido)
+    {
+        try {
+            DB::transaction(function () use ($pedido) {
+                $pedidoBloqueado = Pedido::whereKey($pedido->id)->lockForUpdate()->first();
+
+                if ((int) $pedidoBloqueado->estado === 2) {
+                    return;
+                }
+
+                $cantidades = PedidoProducto::where('pedido_id', $pedidoBloqueado->id)
+                    ->get()
+                    ->groupBy('producto_id')
+                    ->map(fn ($lineas) => (int) $lineas->sum('cantidad'));
+
+                $productos = Producto::whereIn('id', $cantidades->keys())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($cantidades as $productoId => $cantidad) {
+                    $producto = $productos->get($productoId);
+
+                    if ($producto) {
+                        $producto->increment('stock', $cantidad);
+                    }
+                }
+
+                $pedidoBloqueado->estado = 2;
+                $pedidoBloqueado->save();
+            });
+
+            return response()->json([
+                'message' => 'Pedido cancelado',
+                'data' => $pedido->fresh()->load('productos', 'user'),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Error cancelando pedido: ' . $e->getMessage());
+
+            return response()->json(['message' => 'Error al cancelar el pedido'], 500);
+        }
+    }
+
+    /**
+     * La jornada va de las 14:00 del día indicado a las 08:00 del día siguiente.
+     *
+     * @return array{0: string, 1: Carbon, 2: Carbon}
+     */
+    private function ventanaJornada(string $dateString): array
+    {
+        $date = Carbon::parse($dateString);
+        $start = $date->copy()->setTime(14, 0, 0);
+        $end = $date->copy()->addDay()->setTime(8, 0, 0);
+
+        return [$date->toDateString(), $start, $end];
+    }
 }

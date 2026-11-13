@@ -1,0 +1,157 @@
+#jornada-panel {
+    position: fixed;
+    z-index: 30;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: auto;
+    background: #f3f4f6;
+    padding: 1rem 1rem 2rem;
+}
+
+@media (min-width: 768px) {
+    #jornada-panel {
+        left: 18rem;
+    }
+}
+
+.jornada {
+    max-width: 920px;
+    color: #1f2937;
+}
+
+.jornada-volver {
+    display: inline-block;
+    margin-bottom: 0.75rem;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.jornada h1 {
+    margin: 0.2rem 0 0.4rem;
+    font-size: 2.2rem;
+    line-height: 1.1;
+}
+
+.jornada-aviso,
+.jornada-rango,
+.jornada-resumen {
+    margin: 0.35rem 0;
+}
+
+.jornada-aviso {
+    color: #4b5563;
+}
+
+.jornada-herramientas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+    margin: 1rem 0;
+}
+
+.jornada-herramientas label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 700;
+}
+
+.jornada-herramientas input,
+.jornada-herramientas button,
+.jornada-pedido button {
+    border: 0;
+    border-radius: 0.4rem;
+    padding: 0.65rem 0.9rem;
+    font: inherit;
+}
+
+.jornada-herramientas input {
+    background: #fff;
+    border: 1px solid #d1d5db;
+}
+
+.jornada-herramientas button,
+.jornada-pedido button {
+    background: #b91c1c;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.jornada-pedido button:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.jornada-resumen {
+    font-weight: 700;
+}
+
+#jornada-lista {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.jornada-pedido {
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    padding: 1rem;
+}
+
+.jornada-pedido header,
+.jornada-pedido footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.jornada-pedido header span,
+.jornada-pedido p {
+    color: #4b5563;
+}
+
+.jornada-pedido ul {
+    margin: 0.5rem 0;
+    padding-left: 1.1rem;
+}
+
+.jornada-pedido li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.jornada-estado {
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.jornada-estado-pendiente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.jornada-estado-completo {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.jornada-estado-cancelado {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.jornada-pedido-cancelado {
+    background: #f3f4f6;
+}
+
+.jornada-pedido-cancelado strong:first-child {
+    text-decoration: line-through;
+}
